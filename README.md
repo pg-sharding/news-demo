@@ -7,7 +7,7 @@ This is a simple app that collects news from different sources. It consists of t
 
 ## How to run
 
-First, create an article table. Connect to your database and create an `articles` table:
+First, connect to your database and create an `articles` table:
 
 ```sql
 CREATE TABLE articles (
@@ -172,7 +172,7 @@ opgejrqr=> select * from articles where id < 2147483647;
 
 ### Modify and run the app again
 
-Unfortunately, spqr router does not know handle such queries as `SELECT * FROM articles` (at least for now), so we should modify `GetAll()` method in repo/repo.go:
+Unfortunately, spqr router does not know how to handle such queries as `SELECT * FROM articles` (at least for now), so we should modify `GetAll()` method in repo/repo.go:
 
 ```golang
 func (repo *ArticlesRepository) GetAll() ([]*Article, error) {
