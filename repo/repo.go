@@ -9,11 +9,14 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/spaolacci/murmur3"
 )
+
+const seed = 0x12345678
 
 // Article model
 type Article struct {
-	ID          uint
+	ID          uint32
 	URL         string
 	Title       string
 	Description string
@@ -35,9 +38,10 @@ func NewArticlesRepository() (*ArticlesRepository, error) {
 
 // Create creates article
 func (repo *ArticlesRepository) Create(a *Article) error {
+	a.ID = murmur3.Sum32WithSeed([]byte(a.URL), seed) >> 1 // SERIAL type is 2**31
 	_, err :=repo.pool.Exec(context.Background(),
-		"INSERT INTO articles (url, title, description) VALUES ($1, $2, $3)",
-		a.Title, a.URL, a.Description)
+		"INSERT INTO articles (id, url, title, description) VALUES ($1, $2, $3, $4)",
+        a.ID, a.Title, a.URL, a.Description)
 
 	if err != nil {
 		pgerr := err.(*pgconn.PgError)

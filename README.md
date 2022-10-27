@@ -7,7 +7,7 @@ This is a simple app that collects news from different sources. It consists of t
 
 ## How to run
 
-First, connect to your database and create an `articles` table:
+First, create `news` database and `news` user. Connect to it and create an `articles` table:
 
 ```sql
 CREATE TABLE articles (
@@ -21,7 +21,7 @@ CREATE TABLE articles (
 Then build and run the app:
 
 ```bash
-export DATABASE_URL="postgres://postgres@localhost:5432/postgres?sslmode=disable&prefer_simple_protocol=true"
+export DATABASE_URL="postgres://news@localhost:5432/news?sslmode=disable&prefer_simple_protocol=true"
 make
 ./rssparser
 ./apiserver
@@ -31,51 +31,55 @@ Read the latest news from http://localhost:1323.
 
 ## How to shard it
 
-Let's say that we have two PostgreSQL clusters and want to shard the `articles` table. Briefly, we should run spqr, configure it and modify a bit our app.
+Let's say that we have two PostgreSQL clusters and want to shard the `articles` table. We should run the router, configure it and connect to the router insted of a PostgreSQL cluster directly.
 
-### Run router
+### Run the router
 
-Build SPQR from the [source code](https://github.com/pg-sharding/spqr/tree/1f90d39654b81d4c56e6fd4790adab3ed3be9c3d), call `spqr-rr run -c cfg.yaml` with config:
+Build SPQR from the [source code](https://github.com/pg-sharding/spqr/tree/1f90d39654b81d4c56e6fd4790adab3ed3be9c3d), call `spqr-router run -c router.yaml` with config:
 
 ```yaml
-addr: '[::1]:6432'
-adm_addr: '[::1]:7432'
-proto: tcp6
-http_addr: '[::1]:7001'
-log_level: DEBUG5
-qrouter:
-  qrouter_type: PROXY
-rules:
-  frontend_rules:
-    - route_key_cfg:
-        usr: username
-        db: dbname
-      pooling_mode: TRANSACTION
-      auth_rule:
-        auth_method: ok
-  proto: tcp6
-  world_shard_fallback: true
-  shard_mapping:
-    shard1:
-      conn_db: dbname
-      conn_usr: username
-      passwd: password
-      shard_type: DATA
-      hosts:
-        - conn_addr: 'host1:5432'
-    shard2:
-      conn_db: dbname
-      conn_usr: username
-      passwd: '123456'
-      shard_type: DATA
-      hosts:
-        - conn_addr: 'host2:5432'
-  backend_rules:
-    - route_key_cfg:
-        usr: username
-        db: dbname
-      pool_discard: true
-      pool_rollback: true
+host: 'localhost'
+router_port: '6432'
+admin_console_port: '7432'
+grpc_api_port: '7000'
+router_mode: PROXY
+show_notice_messages: true
+frontend_rules:
+  - usr: news
+    db: news
+    pool_mode: TRANSACTION
+    auth_rule:
+      auth_method: ok
+backend_rules:
+  - usr: news
+    db: news
+    pool_discard: true
+    pool_rollback: true
+    auth_rule:
+      auth_method: md5
+      password: password
+shards:
+  shard01:
+    db: news
+    usr: news
+    pwd: password
+    type: DATA
+    tls:
+      sslmode: "required"
+      cert_file: "/Users/denchick/.postgresql/root.crt"
+    hosts:
+      - 'sas-tcwn5bde6pvo9r0k.db.yandex.net:6432'
+  shard02:
+    db: news
+    usr: news
+    pwd: password
+    type: DATA
+    tls:
+      sslmode: "required"
+      cert_file: "/Users/denchick/.postgresql/root.crt"
+    hosts:
+      - 'sas-6puuyjs5sqhcozq9.db.yandex.net:6432'
+
 ```
 
 ### Configure SPQR
@@ -83,53 +87,58 @@ rules:
 SPQR has an administrative console. This is an app that works by PostgreSQL protocol and you can connect to it by usual `psql`.
 
 ```bash
-➜  news-demo git:(main) ✗ psql "host=localhost sslmode=disable user=username dbname=dbname port=7432"
+➜  news-demo git:(main) ✗ psql "host=localhost sslmode=disable user=news dbname=news port=7432"
 
                 SQPR router admin console
         Here you can configure your routing rules
 ------------------------------------------------
         You can find documentation here 
-https://github.com/pg-sharding/spqr/tree/master/doc/router
+https://github.com/pg-sharding/spqr/tree/master/docs
 
-psql (13.3, server console)
+psql (14.5 (Homebrew), server console)
 Type "help" for help.
 
-dbname=?> SHOW SHARDS;
-                                                         listing data shards                                                         
--------------------------------------------------------------------------------------------------------------------------------------
- datashard with ID &{sh1 %!s(*config.ShardCfg=&{[0xc000140be0] dbname username password DATA {  } <nil>})}
- datashard with ID &{sh2 %!s(*config.ShardCfg=&{[0xc000140c00] dbname username password DATA {  } <nil>})}
+news=> SHOW shards;
+    listing data shards    
+---------------------------
+ datashard with ID shard01
+ datashard with ID shard02
 (2 rows)
 ```
 
 As you can see, SPQR knows about shards but that's not all. To make it work, we should create routing rules: specify a sharding column and key ranges. Let's do that:
 
 ```bash
-dbname=> CREATE SHARDING COLUMN id;
+news=> ADD SHARDING RULE rule1 COLUMNS id;
       add sharding rule       
 ------------------------------
  created sharding column [id]
 (1 row)
 
-dbname=> ADD KEY RANGE 1 1073741823 sh1 krid1;
+news=> ADD KEY RANGE krid1 FROM 1 TO 1073741823  ROUTE TO shard01;
              add key range              
 ----------------------------------------
  created key range from 1 to 1073741823
 (1 row)
 
-dbname=> ADD KEY RANGE 1073741824 2147483647 sh2 krid2;
+news=> ADD KEY RANGE krid2 FROM 1073741824 TO 2147483647  ROUTE TO shard02;
                   add key range                  
 -------------------------------------------------
  created key range from 1073741824 to 2147483647
 (1 row)
 
-dbname=> show key_ranges;
+news=> SHOW sharding_rules;
+          listing sharding rules           
+-------------------------------------------
+ sharding rule rule1 with column set: [id]
+(1 row)
+
+news=>  SHOW key_ranges;
  Key range ID | Shard ID | Lower bound | Upper bound 
 --------------+----------+-------------+-------------
- krid2        | sh2      | 1073741824  | 2147483647
- krid1        | sh1      | 1           | 1073741823
+ krid1        | shard01  | 1           | 1073741823
+ krid2        | shard02  | 1073741824  | 2147483647
 (2 rows)
-
 ```
 
 ### Connect to SPQR router
@@ -137,73 +146,59 @@ dbname=> show key_ranges;
 Now we can connect to proxy a.k.a. router and play with it:
 
 ```bash
-➜  news-demo git:(main) ✗ psql "host=localhost sslmode=disable user=username dbname=dbname port=6432"
+➜  news-demo git:(main) ✗ psql "host=localhost sslmode=disable user=news dbname=news port=6432"
 psql (13.3, server 9.6.22)
 Type "help" for help.
 
-dbname=> CREATE TABLE articles (
-dbname(>     id SERIAL NOT NULL PRIMARY KEY,
-dbname(>     url TEXT NOT NULL UNIQUE, 
-dbname(>     title TEXT NOT NULL,
-dbname(>     description TEXT NOT NULL
-dbname(> );
+news=> CREATE TABLE articles (
+    id SERIAL NOT NULL PRIMARY KEY,
+    url TEXT NOT NULL UNIQUE, 
+    title TEXT NOT NULL,
+    description TEXT NOT NULL
+);
+NOTICE: send query to shard(s) : shard01,shard02
 CREATE TABLE
-dbname=> INSERT INTO articles (id, url, title, description) VALUES ('1235', 'https://www.nature.com/articles/d41586-022-01516-2', 'Science needs more research software engineers', 'nope');
+news=> INSERT INTO articles (id, url, title, description) VALUES ('1235', 'https://www.nature.com/articles/d41586-022-01516-2', 'Science needs more research software engineers', 'nope');
+NOTICE: send query to shard(s) : shard01
 INSERT 0 1
-dbname=> INSERT INTO articles (id, url, title, description) VALUES ('2147483644', 'https://www.nature.com/articles/d41586-022-01516-2', 'Science needs more research software engineers', 'nope');
+news=> INSERT INTO articles (id, url, title, description) VALUES ('1073741825', 'https://news.ycombinator.com/item?id=29201000', 'Scalable PostgreSQL Connection Pooler (github.com/yandex)', 'nope');
+news=> INSERT INTO articles (id, url, title, description) VALUES (3803855397, 'https://tiramisu.bearblog.dev/coffee-gift/', 'An ode to that “coffee friend”', 'Comments');
+NOTICE: send query to shard(s) : shard02
 INSERT 0 1
 ```
+
+> NOTICE messages are disabled by default, specify `show_notice_messages` setting in the router config to enable them
 
 You could check now that each shard has only one record:
 
 ```bash
-opgejrqr=> select * from articles where id > 1;
+news=> SELECT * FROM articles WHERE id > 1;
+NOTICE: send query to shard(s) : shard01
   id  |                        url                         |                     title                      | description 
 ------+----------------------------------------------------+------------------------------------------------+-------------
  1235 | https://www.nature.com/articles/d41586-022-01516-2 | Science needs more research software engineers | nope
 (1 row)
 
-opgejrqr=> select * from articles where id < 2147483647;
-     id     |                        url                         |                     title                      | description 
-------------+----------------------------------------------------+------------------------------------------------+-------------
- 2147483644 | https://www.nature.com/articles/d41586-022-01516-2 | Science needs more research software engineers | nope
+news=> SELECT * FROM articles WHERE id < 2147483647;
+NOTICE: send query to shard(s) : shard02
+     id     |                      url                      |                           title                           | description 
+------------+-----------------------------------------------+-----------------------------------------------------------+-------------
+ 1073741825 | https://news.ycombinator.com/item?id=29201000 | Scalable PostgreSQL Connection Pooler (github.com/yandex) | nope
 (1 row)
 ```
 
-### Modify and run the app again
+SPQR can handle such queries as `SELECT * FROM table` but we don't recommend using it. This feature is implemented in a non-transactional way.
 
-Unfortunately, spqr router does not know how to handle such queries as `SELECT * FROM articles` (at least for now), so we should modify `GetAll()` method in repo/repo.go:
-
-```golang
-func (repo *ArticlesRepository) GetAll() ([]*Article, error) {
-	articles := []*Article{}
-	if err := repo.scan(&articles, 1); err != nil {
-		return nil, err
-	}
-	if err := repo.scan(&articles, 1073741824); err != nil {
-		return nil, err
-	}
-
-	return articles, nil
-}
-
-func (repo *ArticlesRepository) scan(articles *[]*Article, id int) error {
-	rows, err := repo.pool.Query(context.Background(), "SELECT * FROM articles WHERE id > $1", id)
-	if err != nil {
-		return fmt.Errorf("unable to SELECT: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		a := Article{}
-		err := rows.Scan(&a.ID, &a.URL, &a.Title, &a.Description)
-		if err != nil {
-			return err
-		}
-		*articles = append(*articles, &a)
-	}
-	return nil
-}
+```bash
+news=> SELECT * FROM articles;
+NOTICE: send query to shard(s) : shard01,shard02
+     id     |                        url                         |                           title                           | description 
+------------+----------------------------------------------------+-----------------------------------------------------------+-------------
+       1235 | https://www.nature.com/articles/d41586-022-01516-2 | Science needs more research software engineers            | nope
+ 1073741825 | https://news.ycombinator.com/item?id=29201000      | Scalable PostgreSQL Connection Pooler (github.com/yandex) | nope
+(2 rows)
 ```
 
-And that's it! Check out that now everything works: rebuild parser and server, run it, play with it.
+## How to run the app again
+
+And that's it! Check out that now everything works: rebuild the parser and the server, run it with `DATABASE_URL="postgres://news@localhost:6432/news?sslmode=disable&prefer_simple_protocol=true"`, play with it.

@@ -35,6 +35,7 @@ require (
 	github.com/jackc/pgx/v4 v4.16.1
 	github.com/labstack/echo/v4 v4.7.2
 	github.com/mmcdole/gofeed v1.1.3
+	github.com/spaolacci/murmur3 v1.1.0
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e // indirect
 	golang.org/x/text v0.3.7 // indirect
 )
