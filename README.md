@@ -1,3 +1,9 @@
+docker-compose-pg2.yaml - подъём двух нод postgre
+debuglocal-newrouter.yaml - поднимаем ноду роутера с подключением к поднятым нодам postgre как к шардам
+debuglocal-init2shards.sql - простейший init с одним распределением и присоединением к нему в т.ч. таблицы articles (см. ниже)
+
+
+RUN - apiserver
 # news-demo
 
 This is a simple app that collects news from different sources. It consists of two parts:

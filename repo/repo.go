@@ -3,12 +3,9 @@ package repo
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spaolacci/murmur3"
 )
 
@@ -27,49 +24,57 @@ type ArticlesRepository struct {
 }
 
 // NewArticlesRepository creates new repo
-func NewArticlesRepository() (*ArticlesRepository, error) {
-	pool, err := pgxpool.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+func NewArticlesRepository(ctx context.Context) (*ArticlesRepository, error) {
+
+	url := "postgres://user1:admin@localhost:6432/db1?sslmode=disable"
+
+	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
+	}
+
+	err = pool.Ping(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	return &ArticlesRepository{pool}, nil
 }
 
 // Create creates article
-func (repo *ArticlesRepository) Create(a *Article) error {
-	a.ID = murmur3.Sum32WithSeed([]byte(a.URL), seed) >> 1 // SERIAL type is 2**31
-	_, err :=repo.pool.Exec(context.Background(),
-		"INSERT INTO articles (id, url, title, description) VALUES ($1, $2, $3, $4)",
-        a.ID, a.Title, a.URL, a.Description)
+func (repo *ArticlesRepository) Create(ctx context.Context, a *Article) error {
+	a.ID = murmur3.Sum32WithSeed([]byte(a.URL), seed) >> 1
+	sql := `INSERT INTO articles (id, url, title, description) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`
+
+	_, err := repo.pool.Exec(ctx, sql, a.ID, a.URL, a.Title, a.Description)
 
 	if err != nil {
-		pgerr := err.(*pgconn.PgError)
-		if pgerrcode.IsIntegrityConstraintViolation(pgerr.Code) {
-			log.Printf("article already exists: %s", a.URL)
-			return nil
-		}
 		return err
 	}
+
+	return nil
+}
+func (repo *ArticlesRepository) CreateArticle(ctx context.Context, a *Article) error {
+	sql := `INSERT INTO articles (id, url, title, description) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`
+
+	_, err := repo.pool.Exec(ctx, sql, a.ID, a.URL, a.Title, a.Description)
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (repo *ArticlesRepository) GetAll() ([]*Article, error) {
-	rows, err := repo.pool.Query(context.Background(), "SELECT * FROM articles")
+// Create creates article
+func (repo *ArticlesRepository) Select(ctx context.Context, a *Article) (pgx.Rows, error) {
+	sql := `select id, url, title, description from articles where id=$1`
+
+	res, err := repo.pool.Query(ctx, sql, a.ID)
+
 	if err != nil {
-		return nil, fmt.Errorf("unable to SELECT: %w", err)
-	}
-	defer rows.Close()
-
-	articles := []*Article{}
-	for rows.Next() {
-		a := Article{}
-		err := rows.Scan(&a.ID, &a.URL, &a.Title, &a.Description)
-		if err != nil {
-			return nil, err
-		}
-		articles = append(articles, &a)
+		return nil, err
 	}
 
-	return articles, nil
+	return res, nil
 }

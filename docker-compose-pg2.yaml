@@ -1,0 +1,21 @@
+services:
+  db1:
+    image: 'bitnami/postgresql:16'
+    ports:
+      - '5550:5432'
+    environment:
+      POSTGRES_USER: user1
+      POSTGRES_PASSWORD: 12345678
+      POSTGRES_DB: db1
+    volumes:
+      - ./pgdata1:/bitnami/postgresql
+  db2:
+    image: 'bitnami/postgresql:16'
+    ports:
+      - '5551:5432'
+    environment:
+      POSTGRES_USER: user1
+      POSTGRES_PASSWORD: 12345678
+      POSTGRES_DB: db1
+    volumes:
+      - ./pgdata2:/bitnami/postgresql

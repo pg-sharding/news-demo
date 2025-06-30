@@ -1,52 +1,47 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
-	"net/http"
-	"time"
 
 	"github.com/denchick/news-aggregator/repo"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 )
 
 func main() {
-	if err := run(); err != nil {
+	ctx := context.Background()
+	repos, err := repo.NewArticlesRepository(ctx)
+	if err != nil {
 		log.Fatal(err)
 	}
-}
 
-func run() error {
-	repo, err := repo.NewArticlesRepository()
+	art := &repo.Article{
+		ID:          92929,
+		URL:         "https://www.example.com",
+		Title:       "do electric sheep dream of androids quotes",
+		Description: "No, they do not",
+	}
+
+	err = repos.Create(ctx, art)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	e := echo.New()
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-
-	e.GET("/", func(c echo.Context) error {
-		articles, err := repo.GetAll()
-		if err != nil {
-			return echo.NewHTTPError(
-				http.StatusInternalServerError,
-				fmt.Errorf("could not get any articles: %w", err),
-			)
+	res, err := repos.Select(ctx, art)
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		arts := []repo.Article{}
+		for res.Next() {
+			art := repo.Article{}
+			err := res.Scan(&art.ID, &art.URL, &art.Title, &art.Description)
+			if err != nil {
+				fmt.Printf("unable to scan row: %v", err)
+				return
+			}
+			arts = append(arts, art)
 		}
-		if len(articles) == 0 {
-			return c.NoContent(http.StatusNotFound)
-		}
-		return c.JSON(http.StatusOK, articles)
-	})
-
-	s := &http.Server{
-		Addr:         ":1323",
-		ReadTimeout:  30 * time.Minute,
-		WriteTimeout: 30 * time.Minute,
+		fmt.Printf("<%v", arts)
 	}
-	e.Logger.Print(e.StartServer(s))
 
-	return nil
 }
