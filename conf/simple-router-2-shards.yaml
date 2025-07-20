@@ -24,8 +24,6 @@ query_routing:
     enhanced_multishard_processing: true
 
 frontend_tls:
-  key_file: /etc/odyssey/ssl/server.key
-  cert_file: /etc/odyssey/ssl/server.crt
   sslmode: disable
 
 frontend_rules:
@@ -57,18 +55,10 @@ backend_rules:
 
 shards:
   sh1:
-    tls:
-      key_file: /etc/odyssey/ssl/server.key
-      sslmode: disable
-      cert_file: /etc/odyssey/ssl/server.crt
     type: DATA
     hosts:
       - 'spqr_pg_shard1:5432'
   sh2:
-    tls:
-      key_file: /etc/odyssey/ssl/server.key
-      sslmode: disable
-      cert_file: /etc/odyssey/ssl/server.crt
     type: DATA
     hosts:
       - 'spqr_pg_shard2:5432'
