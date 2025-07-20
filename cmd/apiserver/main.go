@@ -2,46 +2,44 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"strconv"
 
 	"github.com/denchick/news-aggregator/repo"
 )
 
-func main() {
-	ctx := context.Background()
-	repos, err := repo.NewArticlesRepository(ctx)
-	if err != nil {
-		log.Fatal(err)
+func articleHandler(w http.ResponseWriter, req *http.Request) {
+	id := req.PathValue("id")
+	if id == "" {
+		http.Error(w, "Bad Request: id not found", http.StatusBadRequest)
 	}
-
-	art := &repo.Article{
-		ID:          92929,
-		URL:         "https://www.example.com",
-		Title:       "do electric sheep dream of androids quotes",
-		Description: "No, they do not",
-	}
-
-	err = repos.Create(ctx, art)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	res, err := repos.Select(ctx, art)
-	if err != nil {
-		log.Fatal(err)
+	if idVal, err := strconv.Atoi(id); err != nil {
+		http.Error(w, fmt.Sprintf("Bad Request: id %s is incorrect", id), http.StatusBadRequest)
 	} else {
-		arts := []repo.Article{}
-		for res.Next() {
-			art := repo.Article{}
-			err := res.Scan(&art.ID, &art.URL, &art.Title, &art.Description)
-			if err != nil {
-				fmt.Printf("unable to scan row: %v", err)
-				return
-			}
-			arts = append(arts, art)
+		ctx := context.Background()
+		repos, err := repo.NewArticlesRepository(ctx)
+		if err != nil {
+			log.Fatal(err)
 		}
-		fmt.Printf("<%v", arts)
+		if art, err := repos.Select(ctx, idVal); err != nil {
+			http.Error(w, fmt.Sprintf("Bad Request: id %s is incorrect", id), http.StatusBadRequest)
+		} else {
+			fmt.Println(`id := `, art.ID)
+			json.NewEncoder(w).Encode(art)
+		}
 	}
 
+}
+
+func main() {
+	http.HandleFunc("/article/{id}", articleHandler)
+
+	fmt.Println("Starting server at port 8080")
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		fmt.Println("Error starting the server:", err)
+	}
 }

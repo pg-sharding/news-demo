@@ -13,10 +13,10 @@ const seed = 0x12345678
 
 // Article model
 type Article struct {
-	ID          uint32
-	URL         string
-	Title       string
-	Description string
+	ID          uint32 `json:"id"`
+	URL         string `json:"url"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
 }
 
 type ArticlesRepository struct {
@@ -26,7 +26,7 @@ type ArticlesRepository struct {
 // NewArticlesRepository creates new repo
 func NewArticlesRepository(ctx context.Context) (*ArticlesRepository, error) {
 
-	url := "postgres://user1:admin@localhost:6432/db1?sslmode=disable"
+	url := "postgres://user1:admin@localhost:16432/db1?sslmode=disable"
 
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
@@ -66,15 +66,71 @@ func (repo *ArticlesRepository) CreateArticle(ctx context.Context, a *Article) e
 	return nil
 }
 
-// Create creates article
-func (repo *ArticlesRepository) Select(ctx context.Context, a *Article) (pgx.Rows, error) {
+func (r *ArticlesRepository) Select(ctx context.Context, id int) (*Article, error) {
 	sql := `select id, url, title, description from articles where id=$1`
 
-	res, err := repo.pool.Query(ctx, sql, a.ID)
+	res, err := r.pool.Query(ctx, sql, id)
 
 	if err != nil {
 		return nil, err
 	}
+	notFound := true
+	art := Article{}
+	for notFound && res.Next() {
+		err := res.Scan(&art.ID, &art.URL, &art.Title, &art.Description)
+		if err != nil {
+			fmt.Printf("unable to scan row: %v", err)
+			return nil, err
+		}
+		notFound = false
+	}
+	if notFound {
+		return nil, fmt.Errorf("Article id=%d not found", id)
+	}
+	return &art, nil
+}
 
-	return res, nil
+func (repo *ArticlesRepository) UpsertArticles(ctx context.Context, articles []*Article) ([]*Article, error) {
+	tx, err := repo.pool.BeginTx(context.TODO(), pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback(context.TODO())
+		} else {
+			tx.Commit(context.TODO())
+		}
+	}()
+	sql := `INSERT INTO articles (id, url, title, description)
+        VALUES ($1, $2, $3, $4) 
+      ON CONFLICT (url)
+        DO UPDATE SET
+          title = EXCLUDED.title,
+          description = EXCLUDED.description
+      RETURNING id;
+      `
+
+	batch := &pgx.Batch{}
+	for _, a := range articles {
+		batch.Queue(sql, a.ID, a.URL, a.Title, a.Description)
+	}
+
+	rows := tx.SendBatch(ctx, batch)
+	defer func() {
+		if err := rows.Close(); err != nil {
+			fmt.Printf("Failed to close batch results for cards: Error: %v\n", err)
+		}
+	}()
+
+	for i := range articles {
+		var id uint32
+		err := rows.QueryRow().Scan(&id)
+		if err != nil {
+			return articles, fmt.Errorf("failed to upsert article with url %s. err: %w", articles[i].URL, err)
+		}
+		articles[i].ID = id
+	}
+
+	return articles, nil
 }

@@ -1,0 +1,14 @@
+FROM golang:1.24.5 AS builder
+RUN apt-get update        
+RUN apt-get install -y git
+RUN mkdir /home/src ; cd /home/src ; git clone https://github.com/pg-sharding/spqr.git spqr
+WORKDIR /home/src/spqr
+RUN make && make build GIT_REVISION=devel SPQR_VERSION=devel
+FROM ubuntu:latest
+WORKDIR /spqr/
+RUN pwd
+COPY --from=builder /home/src/spqr/spqr-router .
+COPY ./conf/simple-router-2-shards.yaml .
+COPY ./conf/init2shards.sql .
+CMD ["--config", "/spqr/simple-router-2-shards.yaml"]
+ENTRYPOINT [ "/spqr/spqr-router", "run"]
