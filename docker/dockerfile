@@ -8,7 +8,7 @@ FROM ubuntu:latest
 WORKDIR /spqr/
 RUN pwd
 COPY --from=builder /home/src/spqr/spqr-router .
-COPY ./conf/simple-router-2-shards.yaml .
-COPY ./conf/init2shards.sql .
-CMD ["--config", "/spqr/simple-router-2-shards.yaml"]
+COPY ./conf/router.yaml .
+COPY ./conf/init.sql .
+CMD ["--config", "/spqr/router.yaml"]
 ENTRYPOINT [ "/spqr/spqr-router", "run"]

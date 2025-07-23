@@ -7,9 +7,9 @@ This is a simple app that collects news from different sources. It consists of t
 
 ## How to run
 
-First run sharded system. Here it's easy. Run:  `docker compose -f docker-compose-simple.yaml up`
+First run sharded system. Here it's easy. Run:  `docker compose -f docker-compose.yaml up`
  Then you have got sqpr-router and 2 postgresql16 shards 
-Router will will start with config conf/simple-router-2-shards.yaml. Next it will be autoconfigured with conf/init2shards.sql. Here we create distributions with 2 key ranges and attach to it table `articles`.
+Router will will start with config `conf/router.yaml`. Next it will be autoconfigured with `conf/init.sql`. Here we create distributions with 2 key ranges and attach to it table `articles`.
 
 Next you can run admin console to configure it:
 `psql "host=localhost sslmode=allow user=user1 dbname=db1 port=17432"`

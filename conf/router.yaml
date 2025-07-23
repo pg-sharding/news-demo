@@ -1,12 +1,13 @@
-log_level: log
+log_level: debug
 
-host: '[localhost]'
+host: '0.0.0.0'
 router_port: '6432'
 router_ro_port: '6433'
 admin_console_port: '7432'
 grpc_api_port: '7010'
 
-show_notice_messages: false
+show_notice_messages: true
+pgproto_debug: true
 
 time_quantiles:
   - 0.75
@@ -14,7 +15,7 @@ time_quantiles:
 world_shard_fallback: true
 router_mode: PROXY
 
-init_sql: "/home/aklepov/repoPublic/go/spqr-klepov/examples/debuglocal-init2shards.sql"
+init_sql: "init.sql"
 use_init_sql: true
 
 memqdb_backup_path: "memqdb.json"
@@ -23,8 +24,6 @@ query_routing:
     enhanced_multishard_processing: true
 
 frontend_tls:
-  key_file: /etc/odyssey/ssl/server.key
-  cert_file: /etc/odyssey/ssl/server.crt
   sslmode: disable
 
 frontend_rules:
@@ -56,18 +55,10 @@ backend_rules:
 
 shards:
   sh1:
-    tls:
-      key_file: /etc/odyssey/ssl/server.key
-      sslmode: disable
-      cert_file: /etc/odyssey/ssl/server.crt
     type: DATA
     hosts:
-      - 'localhost:5550'
+      - 'spqr_pg_shard1:5432'
   sh2:
-    tls:
-      key_file: /etc/odyssey/ssl/server.key
-      sslmode: disable
-      cert_file: /etc/odyssey/ssl/server.crt
     type: DATA
     hosts:
-      - 'localhost:5551'
+      - 'spqr_pg_shard2:5432'

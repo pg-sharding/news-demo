@@ -8,7 +8,7 @@ services:
         - "17010:7010" #grpc_api_port 
     hostname: spqr_router_simple
     container_name: spqr_router_simple
-    command: ["--config", "/spqr/simple-router-2-shards.yaml"]
+    command: ["--config", "/spqr/router.yaml"]
     build:
         dockerfile: ./docker/dockerfile
   shard1:

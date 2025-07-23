@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/denchick/news-aggregator/repo"
+	"github.com/denchick/news-aggregator/internal/repo"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mmcdole/gofeed"
 )
