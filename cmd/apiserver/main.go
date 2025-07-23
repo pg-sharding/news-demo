@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/denchick/news-aggregator/repo"
+	"github.com/denchick/news-aggregator/internal/repo"
 )
 
 func articleHandler(w http.ResponseWriter, req *http.Request) {
