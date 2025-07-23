@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strings"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/denchick/news-aggregator/repo"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/mmcdole/gofeed"
 )
 
@@ -16,7 +17,7 @@ func main() {
 	}
 }
 
-var RSSFeeds = []string {
+var RSSFeeds = []string{
 	"https://news.ycombinator.com/rss",
 	"https://habr.com/rss/",
 	"https://www.theverge.com/rss/index.xml",
@@ -24,7 +25,8 @@ var RSSFeeds = []string {
 }
 
 func run() error {
-	s, err := repo.NewArticlesRepository()
+	ctx := context.Background()
+	s, err := repo.NewArticlesRepository(ctx)
 	if err != nil {
 		return err
 	}
@@ -36,7 +38,7 @@ func run() error {
 			return err
 		}
 		for _, a := range articles {
-			if err := s.Create(a); err != nil {
+			if err := s.Create(ctx, a); err != nil {
 				return fmt.Errorf("can't save article %+v: %w", a, err)
 			}
 		}

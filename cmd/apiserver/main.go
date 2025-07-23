@@ -1,52 +1,45 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"time"
+	"strconv"
 
 	"github.com/denchick/news-aggregator/repo"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 )
 
-func main() {
-	if err := run(); err != nil {
-		log.Fatal(err)
+func articleHandler(w http.ResponseWriter, req *http.Request) {
+	id := req.PathValue("id")
+	if id == "" {
+		http.Error(w, "Bad Request: id not found", http.StatusBadRequest)
 	}
+	if idVal, err := strconv.Atoi(id); err != nil {
+		http.Error(w, fmt.Sprintf("Bad Request: id %s is incorrect", id), http.StatusBadRequest)
+	} else {
+		ctx := context.Background()
+		repos, err := repo.NewArticlesRepository(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if art, err := repos.Select(ctx, idVal); err != nil {
+			http.Error(w, fmt.Sprintf("Bad Request: id %s is incorrect", id), http.StatusBadRequest)
+		} else {
+			fmt.Println(`id := `, art.ID)
+			json.NewEncoder(w).Encode(art)
+		}
+	}
+
 }
 
-func run() error {
-	repo, err := repo.NewArticlesRepository()
+func main() {
+	http.HandleFunc("/article/{id}", articleHandler)
+
+	fmt.Println("Starting server at port 8080")
+	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
-		return err
+		fmt.Println("Error starting the server:", err)
 	}
-
-	e := echo.New()
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
-
-	e.GET("/", func(c echo.Context) error {
-		articles, err := repo.GetAll()
-		if err != nil {
-			return echo.NewHTTPError(
-				http.StatusInternalServerError,
-				fmt.Errorf("could not get any articles: %w", err),
-			)
-		}
-		if len(articles) == 0 {
-			return c.NoContent(http.StatusNotFound)
-		}
-		return c.JSON(http.StatusOK, articles)
-	})
-
-	s := &http.Server{
-		Addr:         ":1323",
-		ReadTimeout:  30 * time.Minute,
-		WriteTimeout: 30 * time.Minute,
-	}
-	e.Logger.Print(e.StartServer(s))
-
-	return nil
 }

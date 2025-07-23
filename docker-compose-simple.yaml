@@ -1,0 +1,34 @@
+services:
+  spqr-router-simple:
+    image: spqr-router-simple
+    ports:
+        - "16432:6432" #router_port 
+        - "16433:6433" #router_ro_port
+        - "17432:7432" #admin_console_port 
+        - "17010:7010" #grpc_api_port 
+    hostname: spqr_router_simple
+    container_name: spqr_router_simple
+    command: ["--config", "/spqr/simple-router-2-shards.yaml"]
+    build:
+        dockerfile: ./docker/dockerfile
+  shard1:
+    image: 'bitnami/postgresql:16'
+    hostname: spqr_pg_shard1
+    container_name: spqr_pg_shard1
+    ports:
+      - '5550:5432'
+    environment:
+      POSTGRES_USER: user1
+      POSTGRES_PASSWORD: 12345678
+      POSTGRES_DB: db1
+  shard2:
+    image: 'bitnami/postgresql:16'
+    hostname: spqr_pg_shard2
+    container_name: spqr_pg_shard2
+    ports:
+      - '5551:5432'
+    environment:
+      POSTGRES_USER: user1
+      POSTGRES_PASSWORD: 12345678
+      POSTGRES_DB: db1
+
