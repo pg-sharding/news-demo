@@ -1,37 +1,87 @@
-# news-demo
+# SPQR Demo - News Aggregator
 
-This is a simple app that collects news from different sources. It consists of two parts:
+A simple demonstration of PostgreSQL sharding using SPQR (Stateless Postgres Query Router).
 
-- rssparser - parses RSS feeds and saves it
-- apiserver - gives articles by HTTP
+This app collects news from RSS feeds and automatically distributes articles across PostgreSQL shards.
 
-## How to run
+## 🚀 Quick Start
 
-First run sharded system. Here it's easy. Run:  `docker compose -f docker-compose.yaml up`
- Then you have got sqpr-router and 2 postgresql16 shards 
-Router will will start with config `conf/router.yaml`. Next it will be autoconfigured with `conf/init.sql`. Here we create distributions with 2 key ranges and attach to it table `articles`.
-
-Next you can run admin console to configure it:
-`psql "host=localhost sslmode=allow user=user1 dbname=db1 port=17432"`
-
-or you can use sql run commands in psql using router:
-`psql "host=localhost sslmode=allow user=user1 dbname=db1 port=16432"`
-
-First, connect to db1 and create an `articles` table:
-
-```sql
-CREATE TABLE articles (
-    id SERIAL NOT NULL PRIMARY KEY,    
-    url TEXT NOT NULL UNIQUE, 
-    title TEXT NOT NULL,
-    description TEXT NOT NULL
-);
-```
-
-Then build and run demo apps:
 ```bash
-make build
+make demo
 ```
-Run `rssparser` to fill sharded db articles
-Run `apiserver` to get loaded articles http://localhost:8080/article/{id}.
+
+That's it! You now have:
+- 2 PostgreSQL shards running
+- SPQR router distributing queries automatically  
+- 30+ news articles loaded and distributed across shards
+- API server ready for testing
+
+## 🧪 Test the Sharding
+
+```bash
+# See how data is distributed across shards
+make test
+
+# Test the API endpoints  
+make demo-api
+```
+
+## 📊 What You'll See
+
+1. **Automatic Distribution**: Articles are distributed across shards based on their ID hash
+2. **Transparent Querying**: The API queries through SPQR, which routes to the correct shard
+3. **Live Data**: Real news articles from Hacker News, Habr, The Verge, and Wired
+4. **Simple Validation**: Easy commands to verify everything is working
+
+## 🔧 Architecture
+
+```
+[RSS Parser] → [SPQR Router] → [Shard 1 & Shard 2]
+                     ↑
+              [API Server]
+```
+
+## 🛠️ Manual Testing
+
+Connect directly to SPQR router:
+```bash
+PGPASSWORD=12345678 psql "host=localhost user=user1 dbname=db1 port=16432"
+```
+
+Or check individual shards:
+```bash
+# Shard 1
+PGPASSWORD=12345678 psql "host=localhost user=user1 dbname=db1 port=5550"
+
+# Shard 2  
+PGPASSWORD=12345678 psql "host=localhost user=user1 dbname=db1 port=5551"
+```
+
+Try queries like:
+```sql
+-- See all articles
+SELECT COUNT(*) FROM articles;
+
+-- Get a specific article by ID  
+SELECT * FROM articles WHERE id = 2083415601;
+
+-- See which articles are on this shard
+SELECT id, left(title, 50) as title FROM articles LIMIT 5;
+```
+
+## 🧹 Cleanup
+
+```bash
+make clean
+```
+
+---
+
+## About SPQR
+
+This demo showcases [SPQR (Stateless Postgres Query Router)](https://github.com/pg-sharding/spqr), which provides:
+
+- **Transparent Sharding**: Applications connect as if to a single PostgreSQL instance
+- **Automatic Routing**: Queries are routed to the correct shard based on distribution keys
+- **Easy Setup**: No application changes required for existing PostgreSQL apps
 
