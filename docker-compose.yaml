@@ -10,7 +10,15 @@ services:
     container_name: spqr_router_simple
     command: ["--config", "/spqr/router.yaml"]
     build:
-        dockerfile: ./docker/dockerfile
+        dockerfile: ./docker/Dockerfile
+    depends_on:
+      - shard1
+      - shard2
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   shard1:
     image: 'bitnami/postgresql:16'
     hostname: spqr_pg_shard1
@@ -21,6 +29,11 @@ services:
       POSTGRES_USER: user1
       POSTGRES_PASSWORD: 12345678
       POSTGRES_DB: db1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user1 -d db1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   shard2:
     image: 'bitnami/postgresql:16'
     hostname: spqr_pg_shard2
@@ -31,4 +44,9 @@ services:
       POSTGRES_USER: user1
       POSTGRES_PASSWORD: 12345678
       POSTGRES_DB: db1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user1 -d db1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 

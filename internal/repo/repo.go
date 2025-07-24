@@ -26,7 +26,7 @@ type ArticlesRepository struct {
 // NewArticlesRepository creates new repo
 func NewArticlesRepository(ctx context.Context) (*ArticlesRepository, error) {
 
-	url := "postgres://user1:admin@localhost:16432/db1?sslmode=disable"
+	url := "postgres://user1:12345678@localhost:16432/db1?sslmode=disable"
 
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
